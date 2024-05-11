@@ -1,4 +1,4 @@
-package com.addnewer.api;
+package com.addnewer.easylink.api;
 
 import org.apache.flink.streaming.api.datastream.DataStream;
 

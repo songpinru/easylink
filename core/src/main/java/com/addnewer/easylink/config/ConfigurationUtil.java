@@ -1,4 +1,4 @@
-package com.addnewer.config;
+package com.addnewer.easylink.config;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.api.java.utils.ParameterTool;

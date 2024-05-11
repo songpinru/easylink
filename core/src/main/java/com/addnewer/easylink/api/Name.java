@@ -1,4 +1,4 @@
-package com.addnewer.api;
+package com.addnewer.easylink.api;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;

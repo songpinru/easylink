@@ -1,4 +1,4 @@
-package com.addnewer.api;
+package com.addnewer.easylink.api;
 
 import java.lang.annotation.*;
 
@@ -11,5 +11,5 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.FIELD})
 public @interface Value {
-    String value() default "";
+    String value();
 }

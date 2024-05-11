@@ -1,4 +1,4 @@
-package com.addnewer;
+package com.addnewer.easylink;
 
 import org.apache.flink.api.common.ExecutionConfig;
 

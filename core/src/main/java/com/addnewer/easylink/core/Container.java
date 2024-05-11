@@ -1,4 +1,4 @@
-package com.addnewer.core;
+package com.addnewer.easylink.core;
 
 import java.util.HashMap;
 import java.util.Map;

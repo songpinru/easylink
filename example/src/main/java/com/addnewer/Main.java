@@ -1,5 +1,7 @@
 package com.addnewer;
 
+import com.addnewer.easylink.Application;
+
 /**
  * @author pinru
  * @version 1.0

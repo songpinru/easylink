@@ -1,8 +1,8 @@
-package com.addnewer.core;
+package com.addnewer.easylink.core;
 
 
-import com.addnewer.api.*;
-import com.addnewer.config.ConfigurationUtil;
+import com.addnewer.easylink.config.ConfigurationUtil;
+import com.addnewer.easylink.api.*;
 import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.slf4j.Logger;
@@ -158,8 +158,8 @@ public class Bootstrap {
                     try {
                         String value = container.getBean(k);
                         f.set(c, translate(f.getType(), value));
-                    } catch (IllegalAccessException | RuntimeException e) {
-                        throw new BootstrapException("注入@Value:{} 失败.", e, k);
+                    } catch (IllegalAccessException e) {
+                        throw new BootstrapException("{} 注入@Value:{} 失败.", e,clazz.getName(), k);
                     }
                 });
                 return c;
@@ -188,6 +188,9 @@ public class Bootstrap {
             field.setAccessible(true);
             if (field.isAnnotationPresent(Value.class)) {
                 final Value value = field.getAnnotation(Value.class);
+                if(value.value().isEmpty()){
+                    throw new BootstrapException("Value 值不可为空！");
+                }
                 values.put(Key.of(String.class, value.value()), field);
                 injectValue(value);
             }

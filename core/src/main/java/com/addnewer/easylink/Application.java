@@ -1,8 +1,8 @@
-package com.addnewer;
+package com.addnewer.easylink;
 
 
-import com.addnewer.core.Bootstrap;
-import com.addnewer.core.ComponentsProvider;
+import com.addnewer.easylink.core.Bootstrap;
+import com.addnewer.easylink.core.ComponentsProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

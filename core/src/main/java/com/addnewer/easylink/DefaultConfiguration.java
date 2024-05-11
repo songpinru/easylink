@@ -1,8 +1,7 @@
-package com.addnewer;
+package com.addnewer.easylink;
 
-import com.addnewer.api.Bean;
-import com.addnewer.api.Configuration;
-import com.addnewer.api.Value;
+import com.addnewer.easylink.api.Bean;
+import com.addnewer.easylink.api.Configuration;
 import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 

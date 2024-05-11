@@ -1,6 +1,6 @@
-package com.addnewer;
+package com.addnewer.easylink;
 
-import com.addnewer.core.ComponentsProvider;
+import com.addnewer.easylink.core.ComponentsProvider;
 
 import java.util.List;
 

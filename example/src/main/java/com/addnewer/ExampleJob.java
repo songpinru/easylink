@@ -1,7 +1,8 @@
 package com.addnewer;
 
-import com.addnewer.api.AppSource;
-import com.addnewer.api.FlinkJob;
+import com.addnewer.easylink.api.AppSource;
+import com.addnewer.easylink.api.FlinkJob;
+import com.addnewer.easylink.api.Value;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 
 /**
@@ -12,6 +13,8 @@ public class ExampleJob implements FlinkJob {
     private final AppSource<String> appSource;
     private final SinkFunction<String> sinkFunction;
 
+    @Value("ss")
+    Integer aa;
     public ExampleJob(AppSource<String> appSource, SinkFunction<String> sinkFunction) {
         this.appSource = appSource;
         this.sinkFunction = sinkFunction;
@@ -19,6 +22,7 @@ public class ExampleJob implements FlinkJob {
 
     @Override
     public void run() throws Exception {
-        appSource.getDataStream().addSink(sinkFunction);
+        System.out.println(aa);
+        // appSource.getDataStream().addSink(sinkFunction);
     }
 }

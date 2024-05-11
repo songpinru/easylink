@@ -1,8 +1,8 @@
 package com.addnewer;
 
-import com.addnewer.api.AppSource;
-import com.addnewer.api.Bean;
-import com.addnewer.api.Configuration;
+import com.addnewer.easylink.api.AppSource;
+import com.addnewer.easylink.api.Bean;
+import com.addnewer.easylink.api.Configuration;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.PrintSinkFunction;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;

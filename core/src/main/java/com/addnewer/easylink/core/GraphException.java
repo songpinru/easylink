@@ -1,4 +1,4 @@
-package com.addnewer.core;
+package com.addnewer.easylink.core;
 
 import org.slf4j.helpers.MessageFormatter;
 

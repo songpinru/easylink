@@ -1,4 +1,4 @@
-package com.addnewer.api;
+package com.addnewer.easylink.api;
 
 /**
  * Flink 任务的主要逻辑,用于实现解耦
