@@ -12,8 +12,11 @@
     <modules>
         <module>core</module>
         <module>example</module>
+        <module>test</module>
+        <module>jdbc</module>
+        <module>kafka</module>
     </modules>
-    <name>Easy flink Development</name>
+    <name>An Easy flink Development</name>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
@@ -25,7 +28,6 @@
     </properties>
 
     <dependencies>
-
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
@@ -41,13 +43,31 @@
             <artifactId>flink-clients</artifactId>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-table-planner_2.12</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
+
+
+
     <dependencyManagement>
         <dependencies>
             <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-api</artifactId>
                 <version>${slf4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>1.18.32</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.flink</groupId>
@@ -60,9 +80,34 @@
                 <version>${flink.version}</version>
             </dependency>
             <dependency>
+                <groupId>org.apache.flink</groupId>
+                <artifactId>flink-table-planner_2.12</artifactId>
+                <version>${flink.version}</version>
+            </dependency>
+            <dependency>
                 <groupId>org.apache.logging.log4j</groupId>
                 <artifactId>log4j-slf4j2-impl</artifactId>
                 <version>${log4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.flink</groupId>
+                <artifactId>flink-test-utils</artifactId>
+                <version>${flink.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.flink</groupId>
+                <artifactId>flink-connector-base</artifactId>
+                <version>${flink.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.flink</groupId>
+                <artifactId>flink-connector-jdbc</artifactId>
+                <version>3.1.2-1.18</version>
+            </dependency>
+            <dependency>
+                <groupId>com.ververica</groupId>
+                <artifactId>flink-connector-mysql-cdc</artifactId>
+                <version>3.0.1</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

@@ -3,7 +3,10 @@ package com.addnewer.easylink.core;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -15,8 +18,8 @@ class GraphContext {
     private static final Logger logger = LoggerFactory.getLogger(GraphContext.class);
 
     private final Map<Key, InjectFunction<?>> injectMap;
-    private final Map<Key, List<Key>> dependency;
-    private final Map<Key, List<Key>> dependOn;
+    private final Map<Key, Set<Key>> dependency;
+    private final Map<Key, Set<Key>> dependOn;
     private final Container singleton = new Container();
     private final Set<Key> entryPoints = new HashSet<>();
 
@@ -27,10 +30,10 @@ class GraphContext {
     }
 
     public void injectBean(Key key, InjectFunction<?> injectFunction) {
-        injectBean(key, injectFunction, List.of());
+        injectBean(key, injectFunction, Set.of());
     }
 
-    public void injectBean(Key key, InjectFunction<?> injectFunction, List<Key> paramKeys) {
+    public void injectBean(Key key, InjectFunction<?> injectFunction, Set<Key> paramKeys) {
         logger.debug("inject bean {}", key);
         injectMap.put(key, injectFunction);
         edgeRelation(key, paramKeys);
@@ -74,7 +77,7 @@ class GraphContext {
     private <T> Map<Key, Integer> generateTopologyMap(Key<T>... keys) {
         final Map<Key, Integer> topologyMap = new ConcurrentHashMap<>();
         for (final Key<T> key : keys) {
-            topology(topologyMap, key);
+            topology(topologyMap, key, 0);
         }
         return topologyMap;
     }
@@ -99,34 +102,37 @@ class GraphContext {
 
     private void computeTopology(Map<Key, Integer> topologyMap, Key k) {
         dependOn
-                .getOrDefault(k, List.of())
+                .getOrDefault(k, Set.of())
                 .forEach(in -> {
                     topologyMap.computeIfPresent(in, (i, v) -> v - 1);
                     computeTopology(topologyMap, in);
                 });
     }
 
-    private int topology(Map<Key, Integer> map, Key key) {
+    private int topology(Map<Key, Integer> map, Key key, int nodes) {
+        if (nodes > injectMap.size()) {
+            throw new GraphException("依赖出现循环,请检查是否符合DAG.");
+        }
         logger.debug("topology bean:{}", key);
-        final List<Key> dependencies = dependency.get(key);
+        final Set<Key> dependencies = dependency.get(key);
         if (dependencies == null) {
-            throw new GraphException("{} 依赖的Bean:{} 不存在!",dependOn.get(key),key);
+            throw new GraphException("{} 依赖的Bean:{} 不存在!", dependOn.get(key), key);
         }
         int count = dependencies.size();
         for (final Key dependency : dependencies) {
             if (map.containsKey(dependency)) {
                 count += map.get(dependency);
             } else {
-                count += topology(map, dependency);
+                count += topology(map, dependency, nodes + 1);
             }
         }
         map.put(key, count);
         return count;
     }
 
-    private void edgeRelation(Key key, List<Key> paramKeys) {
+    private void edgeRelation(Key key, Set<Key> paramKeys) {
         dependency.put(key, paramKeys);
-        paramKeys.forEach(p -> dependOn.computeIfAbsent(p, k -> new ArrayList<>()).add(key));
+        paramKeys.forEach(p -> dependOn.computeIfAbsent(p, k -> new HashSet<>()).add(key));
     }
 
 

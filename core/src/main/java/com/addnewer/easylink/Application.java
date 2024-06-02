@@ -1,15 +1,12 @@
 package com.addnewer.easylink;
 
 
+import com.addnewer.easylink.api.FlinkJob;
 import com.addnewer.easylink.core.Bootstrap;
-import com.addnewer.easylink.core.ComponentsProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.ServiceLoader;
+import java.util.*;
 
 /**
  * @author pinru
@@ -18,7 +15,7 @@ import java.util.ServiceLoader;
 public class Application {
     private static final Logger logger = LoggerFactory.getLogger(Application.class);
 
-    private final List<Class<?>> components = new ArrayList<>();
+    private final Set<Class<?>> components = new HashSet<>();
     private final Bootstrap bootstrap;
 
     public static Application app(String[] args) {
@@ -36,15 +33,23 @@ public class Application {
     }
 
     public void run() throws Exception {
-        ArrayList<Class<?>> defaultComponents = new ArrayList<>();
+
+        logger.info("init application.");
+        logger.info("load  application components: {} .", components);
+        final List<Class<? extends FlinkJob>> jobs = new ArrayList<>();
+        for (Class<?> clazz : components) {
+            bootstrap.injectComponent(clazz);
+            if (FlinkJob.class.isAssignableFrom(clazz)) {
+                jobs.add((Class<? extends FlinkJob>) clazz);
+            }
+        }
+
+        Set<Class<?>> defaultComponents = new HashSet<>();
         defaultComponents.add(DefaultConfiguration.class);
-        ServiceLoader
-                .load(ComponentsProvider.class)
-                .stream()
-                .map(ServiceLoader.Provider::get)
-                .flatMap(cs -> cs.get().stream())
-                .forEach(defaultComponents::add);
-        bootstrap.run(components, defaultComponents);
+
+        logger.info("load default components: {} .", defaultComponents);
+        bootstrap.injectDefaultComponents(defaultComponents);
+        bootstrap.run(jobs);
     }
 
 

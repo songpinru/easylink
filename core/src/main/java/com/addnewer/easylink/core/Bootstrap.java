@@ -1,9 +1,12 @@
 package com.addnewer.easylink.core;
 
 
-import com.addnewer.easylink.config.ConfigurationUtil;
 import com.addnewer.easylink.api.*;
+import com.addnewer.easylink.auto.AutoUtil;
+import com.addnewer.easylink.config.ConfigurationUtil;
+import com.addnewer.easylink.utils.PojoUtil;
 import org.apache.flink.api.java.utils.ParameterTool;
+import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,43 +22,71 @@ public class Bootstrap {
     private static final Logger logger = LoggerFactory.getLogger(Bootstrap.class);
 
 
-    private static final Key<ParameterTool> ARGS = Key.of(ParameterTool.class, "args");
-    private static final Key<ParameterTool> SYSTEM = Key.of(ParameterTool.class, "system");
-    private static final Key<ParameterTool> FILE = Key.of(ParameterTool.class, "file");
+    public static final Key<ParameterTool> ARGS = Key.of(ParameterTool.class, "args");
+    public static final Key<ParameterTool> SYSTEM = Key.of(ParameterTool.class, "system");
+    public static final Key<ParameterTool> CONFIG = Key.of(ParameterTool.class, "config");
 
+    private ParameterTool config;
 
     private final GraphContext context = new GraphContext();
+    List<AutoInject> list = ServiceLoader
+            .load(AutoInject.class)
+            .stream()
+            .map(ServiceLoader.Provider::get)
+            .toList();
 
 
     public Bootstrap(String[] args) {
         initArgs(args);
     }
 
-    private void initArgs(final String[] args) {
-        context.injectBean(ARGS, container -> args);
-        context.injectBean(SYSTEM, container -> ParameterTool.fromSystemProperties());
-        context.injectBean(FILE, container -> ConfigurationUtil.loadConfigurations(args));
+    public Bootstrap() {
+    }
+
+    public void initArgs(final String[] args) {
+        injectBean(ARGS, ParameterTool.fromArgs(args));
+        injectBean(SYSTEM, ParameterTool.fromSystemProperties());
+        initConfig(ConfigurationUtil.loadConfigurations(args));
+    }
+
+    public void initConfig(ParameterTool config) {
+        this.config = config;
+        injectBean(CONFIG, config);
+    }
+
+    private void injectBean(Key<?> key, Object object) {
+        injectBean(key, container -> object);
+    }
+
+    private void injectBean(Key<?> key, InjectFunction<?> injectFunction) {
+        injectBean(key, injectFunction, Set.of());
     }
 
 
-    public void run(List<Class<?>> components, List<Class<?>> defaultComponents) throws Exception {
-        logger.info("init application.");
-        logger.info("load  application components: {} .", components);
-        final List<Class<? extends FlinkJob>> jobs = new ArrayList<>();
-        for (Class<?> clazz : components) {
-            injectComponent(clazz);
-            if (FlinkJob.class.isAssignableFrom(clazz)) {
-                context.addEntryPoint(clazz);
-                jobs.add((Class<? extends FlinkJob>) clazz);
-            }
+    private void injectBean(Key<?> key, InjectFunction<?> injectFunction, Set<Key> paramKeys) {
+        context.injectBean(key, injectFunction, paramKeys);
+    }
+
+    private void autoInjectPojo(Class<?> clazz, String name) {
+        Key<?> key = Key.of(clazz, name);
+        if (!context.isKeyExist(key)) {
+            list.forEach(
+                    autoInject -> {
+                        if (autoInject.isAutoInject(clazz)) {
+                            Object bean = autoInject.auto(name, config);
+                            injectBean(key, bean);
+                        }
+                    }
+            );
         }
 
-        logger.info("load default components: {} .", defaultComponents);
-        injectDefaultComponents(defaultComponents);
+    }
 
+    public void run(List<Class<? extends FlinkJob>> jobs) throws Exception {
+        logger.info("run flink jobs: {} .", jobs);
+        jobs.forEach(context::addEntryPoint);
         context.generateContainer();
 
-        logger.info("run flink jobs: {} .", jobs);
         StreamExecutionEnvironment env = context.getInstance(StreamExecutionEnvironment.class);
         if (jobs.isEmpty()) {
             throw new BootstrapException("No FlinkJob found.");
@@ -67,47 +98,72 @@ public class Bootstrap {
         env.execute();
     }
 
-
-    private void injectionBeans(Class<?> configuration, boolean ignore) {
+    public void injectBeansOfConfiguration(Class<?> configuration, boolean ignore) {
 
         Key<?> configKey = Key.of(configuration);
+
         Arrays
-                .stream(configuration.getMethods())
-                .filter(method -> method.getAnnotation(Bean.class) != null)
+                .stream(configuration.getDeclaredMethods())
                 .forEach(method -> {
-                    final Class<?> bind = getBind(method);
+                    method.setAccessible(true);
                     final String name = getName(method);
-                    final Key key = new Key(bind, name);
-                    if (isKeyExist(key, ignore)) return;
-
                     final List<Key> paramKeys = getParamKeys(method);
-                    final InjectFunction<?> injectFunction = container -> {
-                        try {
-                            Object config = container.getBean(configKey);
-                            return method.invoke(config, paramKeys
-                                    .stream()
-                                    .map(container::getBean)
-                                    .toArray());
-                        } catch (InvocationTargetException | IllegalAccessException e) {
-                            throw new BootstrapException("注入Bean: {} 失败.", key, e);
-                        }
+                    final InjectFunction<?> injectFunction;
+                    final Key key;
 
-                    };
-                    ArrayList<Key> keys = new ArrayList<>();
+                    if (method.isAnnotationPresent(Source.class)) {
+                        Class<?> returnType = method.getReturnType();
+                        if (DataStream.class.isAssignableFrom(returnType)) {
+                            key = new Key(AppSource.class, name);
+                            if (isKeyExist(key, ignore)) return;
+
+                            injectFunction = container -> {
+                                Object config = container.getBean(configKey);
+                                return (AppSource) () -> (DataStream) method.invoke(config, paramKeys
+                                        .stream()
+                                        .map(container::getBean)
+                                        .toArray());
+
+                            };
+
+                        } else {
+                            throw new BootstrapException("{} 里Source的返回类型必须是DataStream！", configuration.getName());
+                        }
+                    } else if (method.isAnnotationPresent(Bean.class)) {
+                        final Class<?> bind = getBind(method);
+                        key = new Key(bind, name);
+                        injectFunction = container -> {
+                            try {
+                                Object config = container.getBean(configKey);
+                                return method.invoke(config, paramKeys
+                                        .stream()
+                                        .map(container::getBean)
+                                        .toArray());
+                            } catch (InvocationTargetException | IllegalAccessException e) {
+                                throw new BootstrapException("注入Bean: {} 失败.", key, e);
+                            }
+
+                        };
+                    } else {
+                        return;
+                    }
+                    Set<Key> keys = new HashSet<>();
                     keys.addAll(paramKeys);
                     keys.add(configKey);
-                    context.injectBean(key, injectFunction, keys);
+                    injectBean(key, injectFunction, keys);
+
                 });
+
     }
 
 
-    private void injectComponent(Class<?> clazz) {
+    public void injectComponent(Class<?> clazz) {
         logger.debug("inject component: {}", clazz);
 
         injectComponent(clazz, false);
     }
 
-    private void injectDefaultComponents(List<Class<?>> components) {
+    public void injectDefaultComponents(Set<Class<?>> components) {
         logger.debug("inject default components: {}", components);
         for (final Class<?> component : components) {
             injectComponent(component, true);
@@ -154,12 +210,11 @@ public class Bootstrap {
                         .map(container::getBean)
                         .toArray());
                 values.forEach((k, f) -> {
-                    f.setAccessible(true);
                     try {
                         String value = container.getBean(k);
-                        f.set(c, translate(f.getType(), value));
+                        PojoUtil.transform(c,f,value);
                     } catch (IllegalAccessException e) {
-                        throw new BootstrapException("{} 注入@Value:{} 失败.", e,clazz.getName(), k);
+                        throw new BootstrapException("{} 注入@Value:{} 失败.", e, clazz.getName(), k);
                     }
                 });
                 return c;
@@ -168,16 +223,14 @@ public class Bootstrap {
             }
         };
         if (clazz.isAnnotationPresent(Configuration.class)) {
-            injectionBeans(clazz, ignore);
+            injectBeansOfConfiguration(clazz, ignore);
         }
-        if (values.isEmpty()) {
-            context.injectBean(key, injectFunction, paramKeys);
-        } else {
-            ArrayList<Key> keys = new ArrayList<>();
-            keys.addAll(paramKeys);
+        Set<Key> keys = new HashSet<>();
+        keys.addAll(paramKeys);
+        if (!values.isEmpty()) {
             keys.addAll(values.keySet());
-            context.injectBean(key, injectFunction, keys);
         }
+        injectBean(key, injectFunction, keys);
     }
 
 
@@ -188,7 +241,7 @@ public class Bootstrap {
             field.setAccessible(true);
             if (field.isAnnotationPresent(Value.class)) {
                 final Value value = field.getAnnotation(Value.class);
-                if(value.value().isEmpty()){
+                if (value.value().isEmpty()) {
                     throw new BootstrapException("Value 值不可为空！");
                 }
                 values.put(Key.of(String.class, value.value()), field);
@@ -198,29 +251,7 @@ public class Bootstrap {
         return values;
     }
 
-    private static Object translate(Class<?> clazz, String value) {
-        if (String.class.equals(clazz)) {
-            return value;
-        } else if (Integer.class.equals(clazz) || int.class.equals(clazz)) {
-            return Integer.parseInt(value);
-        } else if (Long.class.equals(clazz) || long.class.equals(clazz)) {
-            return Long.parseLong(value);
-        } else if (Double.class.equals(clazz) || double.class.equals(clazz)) {
-            return Double.parseDouble(value);
-        } else if (Float.class.equals(clazz) || float.class.equals(clazz)) {
-            return Float.parseFloat(value);
-        } else if (Boolean.class.equals(clazz) || boolean.class.equals(clazz)) {
-            return Boolean.parseBoolean(value);
-        } else if (Byte.class.equals(clazz) || byte.class.equals(clazz)) {
-            return Byte.parseByte(value);
-        } else if (Short.class.equals(clazz) || short.class.equals(clazz)) {
-            return Short.parseShort(value);
-            // } else if (List.class.isAssignableFrom(clazz)) {
-            //     return List.of(value.split(","));
-        } else {
-            throw new BootstrapException("不支持的@Value类型: {}.", clazz.getName());
-        }
-    }
+
 
 
     private boolean isKeyExist(Key key, boolean ignore) {
@@ -239,6 +270,7 @@ public class Bootstrap {
         final ArrayList<Key> paramsKey = new ArrayList<>();
         for (final Parameter parameter : executable.getParameters()) {
             final String paramName = getName(parameter);
+            autoInjectPojo(parameter.getType(), paramName);
             paramsKey.add(Key.of(parameter.getType(), paramName));
         }
         return paramsKey;
@@ -248,13 +280,13 @@ public class Bootstrap {
     private void injectValue(Value annotation) {
         String propertyName = annotation.value();
         Key<String> key = Key.of(String.class, propertyName);
-        context.injectBean(
+        injectBean(
                 key,
                 container -> {
-                    ParameterTool params = container.getBean(FILE);
+                    ParameterTool params = container.getBean(CONFIG);
                     return params.get(propertyName);
                 },
-                List.of(FILE));
+                Set.of(CONFIG));
 
     }
 

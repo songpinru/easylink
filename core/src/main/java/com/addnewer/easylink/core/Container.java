@@ -11,14 +11,15 @@ import java.util.Map;
 class Container {
     private final Map<Key, Object> beans = new HashMap<>();
 
-    public <T> T getBean(Key key) {
+    public <T> T getBean(Key<T> key) {
         return (T) beans.get(key);
     }
 
-    public <T> void addBean(Key key, T value) {
+    public <T> void addBean(Key<T> key, T value) {
         beans.put(key, value);
     }
-    public boolean containsKey(Key key) {
+
+    public <T> boolean containsKey(Key<T> key) {
         return beans.containsKey(key);
     }
 
